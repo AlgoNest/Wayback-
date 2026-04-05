@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Wayback Wrapper</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen p-8">
+
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-2">Wayback Wrapper</h1>
+    <p class="text-gray-400 mb-8">Search archived snapshots from the Wayback Machine</p>
+
+    <!-- Search Bar -->
+    <div class="flex gap-3 mb-6">
+      <input
+        id="urlInput"
+        type="text"
+        placeholder="Enter a URL e.g. example.com"
+        class="flex-1 bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+      />
+      <select id="mimeFilter" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none">
+        <option value="">All Types</option>
+        <option value="text/html">HTML</option>
+        <option value="application/pdf">PDF</option>
+        <option value="image/jpeg">JPEG</option>
+        <option value="image/png">PNG</option>
+      </select>
+      <button
+        onclick="searchSnapshots()"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-medium transition"
+      >
+        Search
+      </button>
+    </div>
+
+    <!-- Summary Card -->
+    <div id="summaryCard" class="hidden bg-gray-800 border border-gray-700 rounded p-4 mb-6 grid grid-cols-3 gap-4 text-center">
+      <div>
+        <p class="text-gray-400 text-sm">First Seen</p>
+        <p id="firstSeen" class="font-semibold text-white"></p>
+      </div>
+      <div>
+        <p class="text-gray-400 text-sm">Last Seen</p>
+        <p id="lastSeen" class="font-semibold text-white"></p>
+      </div>
+      <div>
+        <p class="text-gray-400 text-sm">Total Snapshots</p>
+        <p id="totalSnapshots" class="font-semibold text-white"></p>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div id="status" class="text-gray-400 mb-4 hidden"></div>
+
+    <!-- Results Table -->
+    <div id="resultsContainer" class="hidden">
+      <table class="w-full text-sm border border-gray-700 rounded overflow-hidden">
+        <thead class="bg-gray-800 text-gray-400 uppercase text-xs">
+          <tr>
+            <th class="px-4 py-3 text-left">Date</th>
+            <th class="px-4 py-3 text-left">Time</th>
+            <th class="px-4 py-3 text-left">Type</th>
+            <th class="px-4 py-3 text-left">Status</th>
+            <th class="px-4 py-3 text-left">Link</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody" class="divide-y divide-gray-700"></tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center text-gray-500 py-16">
+      No snapshots found for this URL.
+    </div>
+  </div>
+
+  <script>
+    function parseTimestamp(ts) {
+      const year   = ts.slice(0, 4);
+      const month  = ts.slice(4, 6);
+      const day    = ts.slice(6, 8);
+      const hour   = ts.slice(8, 10);
+      const minute = ts.slice(10, 12);
+      const second = ts.slice(12, 14);
+      return {
+        date: `${year}-${month}-${day}`,
+        time: `${hour}:${minute}:${second}`
+      };
+    }
+
+    function buildArchiveUrl(timestamp, url) {
+      return `https://web.archive.org/web/${timestamp}/${url}`;
+    }
+
+    async function searchSnapshots() {
+      const urlInput = document.getElementById('urlInput').value.trim();
+      const mimeFilter = document.getElementById('mimeFilter').value;
+      const status = document.getElementById('status');
+      const resultsContainer = document.getElementById('resultsContainer');
+      const resultsBody = document.getElementById('resultsBody');
+      const summaryCard = document.getElementById('summaryCard');
+      const emptyState = document.getElementById('emptyState');
+
+      if (!urlInput) return;
+
+      status.textContent = 'Searching...';
+      status.classList.remove('hidden');
+      resultsContainer.classList.add('hidden');
+      summaryCard.classList.add('hidden');
+      emptyState.classList.add('hidden');
+      resultsBody.innerHTML = '';
+
+      try {
+        let apiUrl = `/api/search?url=${encodeURIComponent(urlInput)}`;
+        if (mimeFilter) apiUrl += `&mime=${encodeURIComponent(mimeFilter)}`;
+
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+
+        if (data.error) {
+          status.textContent = `Error: ${data.error}`;
+          return;
+        }
+
+        const snapshots = data.snapshots;
+
+        if (!snapshots || snapshots.length === 0) {
+          status.classList.add('hidden');
+          emptyState.classList.remove('hidden');
+          return;
+        }
+
+        // Summary card
+        const first = parseTimestamp(snapshots[snapshots.length - 1].timestamp);
+        const last  = parseTimestamp(snapshots[0].timestamp);
+        document.getElementById('firstSeen').textContent = first.date;
+        document.getElementById('lastSeen').textContent = last.date;
+        document.getElementById('totalSnapshots').textContent = snapshots.length;
+        summaryCard.classList.remove('hidden');
+
+        // Rows
+        snapshots.forEach(snap => {
+          const { date, time } = parseTimestamp(snap.timestamp);
+          const archiveUrl = buildArchiveUrl(snap.timestamp, urlInput);
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-gray-800 transition';
+          row.innerHTML = `
+            <td class="px-4 py-3 text-white">${date}</td>
+            <td class="px-4 py-3 text-gray-400">${time}</td>
+            <td class="px-4 py-3 text-gray-400 text-xs">${snap.mimetype || '-'}</td>
+            <td class="px-4 py-3">
+              <span class="bg-green-900 text-green-300 text-xs px-2 py-1 rounded">${snap.statuscode}</span>
+            </td>
+            <td class="px-4 py-3">
+              <a href="${archiveUrl}" target="_blank" class="text-blue-400 hover:underline">View</a>
+            </td>
+          `;
+          resultsBody.appendChild(row);
+        });
+
+        status.classList.add('hidden');
+        resultsContainer.classList.remove('hidden');
+
+      } catch (err) {
+        status.textContent = 'Request failed. Try again.';
+      }
+    }
+
+    document.getElementById('urlInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') searchSnapshots();
+    });
+  </script>
+
+</body>
+</html>
