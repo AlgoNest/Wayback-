@@ -5,26 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Wayback — Web Archive Explorer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #0a0a0f;
-      --surface:   #111118;
-      --surface2:  #18181f;
-      --border:    #23232e;
-      --border2:   #2e2e3a;
-      --accent:    #7c6af7;
-      --accent2:   #a594ff;
-      --green:     #22c55e;
-      --red:       #ef4444;
-      --yellow:    #f59e0b;
-      --text:      #e8e6f0;
-      --muted:     #6b6880;
-      --muted2:    #9490a8;
-      --font:      'Syne', sans-serif;
-      --mono:      'JetBrains Mono', monospace;
+      --bg:       #000000;
+      --surface:  #0d0d0d;
+      --surface2: #141414;
+      --border:   rgba(255,255,255,0.07);
+      --border2:  rgba(255,255,255,0.12);
+      --text:     #ffffff;
+      --muted:    rgba(255,255,255,0.38);
+      --muted2:   rgba(255,255,255,0.58);
+      --font:     'Geist', -apple-system, sans-serif;
+      --mono:     'Geist Mono', monospace;
+      --r:        12px;
     }
 
     html { scroll-behavior: smooth; }
@@ -37,999 +33,576 @@
       overflow-x: hidden;
     }
 
-    /* ── Noise texture overlay ── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.4;
+    /* ── Ambient glow ── */
+    .glow {
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 0; overflow: hidden;
     }
-
-    /* ── Grid background ── */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 40px 40px;
-      opacity: 0.3;
-      pointer-events: none;
-      z-index: 0;
+    .glow::before {
+      content: ''; position: absolute;
+      top: -15%; left: 15%; width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(110,70,255,0.28) 0%, transparent 65%);
+      filter: blur(90px);
+      animation: g1 14s ease-in-out infinite alternate;
     }
+    .glow::after {
+      content: ''; position: absolute;
+      top: 5%; right: 5%; width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(40,110,255,0.2) 0%, transparent 65%);
+      filter: blur(90px);
+      animation: g2 18s ease-in-out infinite alternate;
+    }
+    @keyframes g1 { from { transform: translate(0,0) scale(1); } to { transform: translate(-50px,40px) scale(1.08); } }
+    @keyframes g2 { from { transform: translate(0,0) scale(1); } to { transform: translate(35px,-25px) scale(0.92); } }
 
     /* ── Layout ── */
-    .wrapper {
-      position: relative;
-      z-index: 1;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 48px 24px 80px;
+    .wrap {
+      position: relative; z-index: 1;
+      max-width: 820px; margin: 0 auto;
+      padding: 72px 24px 100px;
     }
 
     /* ── Header ── */
     header {
+      text-align: center;
       margin-bottom: 56px;
-      animation: fadeUp 0.5s ease both;
+      animation: up 0.55s ease both;
     }
 
-    .logo {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
+    .pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 100px; padding: 5px 14px;
+      font-size: 12px; font-weight: 500; color: var(--muted2);
+      margin-bottom: 24px; letter-spacing: 0.1px;
     }
-
-    .logo-mark {
-      width: 32px;
-      height: 32px;
-      background: var(--accent);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      font-weight: 800;
-      color: #fff;
-      letter-spacing: -1px;
-      flex-shrink: 0;
-    }
-
-    .logo-text {
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      color: var(--text);
+    .pill .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #22c55e; box-shadow: 0 0 7px #22c55e;
     }
 
     h1 {
-      font-size: clamp(32px, 6vw, 52px);
-      font-weight: 800;
-      letter-spacing: -2px;
-      line-height: 1.05;
-      color: var(--text);
-      margin-bottom: 12px;
+      font-size: clamp(34px, 5.5vw, 54px);
+      font-weight: 700; letter-spacing: -2.5px;
+      line-height: 1.06; margin-bottom: 14px;
     }
 
-    h1 span {
-      color: var(--accent);
-    }
-
-    .subtitle {
-      font-size: 15px;
-      color: var(--muted2);
-      font-weight: 400;
-      letter-spacing: 0.2px;
+    .sub {
+      font-size: 15px; color: var(--muted);
+      font-weight: 400; line-height: 1.65;
+      max-width: 440px; margin: 0 auto;
+      letter-spacing: -0.1px;
     }
 
     /* ── Tabs ── */
+    .tabs-row {
+      display: flex; justify-content: center;
+      margin-bottom: 36px;
+      animation: up 0.55s 0.07s ease both;
+    }
     .tabs {
-      display: flex;
-      gap: 4px;
+      display: inline-flex; gap: 2px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 4px;
-      margin-bottom: 28px;
-      animation: fadeUp 0.5s 0.1s ease both;
+      border-radius: 100px; padding: 4px;
     }
-
     .tab {
-      flex: 1;
-      padding: 10px 16px;
-      background: transparent;
-      border: none;
-      border-radius: 8px;
-      color: var(--muted);
-      font-family: var(--font);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      letter-spacing: 0.3px;
+      padding: 8px 20px; background: transparent; border: none;
+      border-radius: 100px; color: var(--muted);
+      font-family: var(--font); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.18s;
+      letter-spacing: -0.15px; white-space: nowrap;
     }
-
-    .tab:hover { color: var(--text); }
-
+    .tab:hover { color: var(--muted2); }
     .tab.active {
-      background: var(--surface2);
+      background: rgba(255,255,255,0.09);
       color: var(--text);
-      border: 1px solid var(--border2);
+      border: 1px solid rgba(255,255,255,0.12);
     }
 
-    /* ── Panels ── */
-    .panel { display: none; animation: fadeUp 0.3s ease both; }
-    .panel.active { display: block; }
+    /* ── Panel ── */
+    .panel { display: none; }
+    .panel.active { display: block; animation: up 0.28s ease both; }
 
-    /* ── Card ── */
-    .card {
+    /* ── Search box ── */
+    .sbox {
+      display: flex; align-items: center;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 20px;
-    }
-
-    .card-title {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 16px;
-    }
-
-    /* ── Form elements ── */
-    .input-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .input-wrap {
-      flex: 1;
-      min-width: 200px;
-      position: relative;
-    }
-
-    .input-wrap .icon {
-      position: absolute;
-      left: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--muted);
-      font-size: 14px;
-      pointer-events: none;
-    }
-
-    input[type="text"],
-    input[type="date"],
-    select {
-      width: 100%;
-      background: var(--surface2);
       border: 1px solid var(--border2);
-      border-radius: 10px;
-      padding: 12px 14px 12px 38px;
-      color: var(--text);
-      font-family: var(--mono);
-      font-size: 13px;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      border-radius: 14px;
+      padding: 6px 6px 6px 18px;
+      margin-bottom: 8px;
+      transition: border-color 0.18s, box-shadow 0.18s;
+    }
+    .sbox:focus-within {
+      border-color: rgba(255,255,255,0.22);
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.035);
+    }
+    .sbox input {
+      flex: 1; background: transparent; border: none; outline: none;
+      font-family: var(--mono); font-size: 13.5px;
+      color: var(--text); letter-spacing: -0.3px;
+    }
+    .sbox input::placeholder { color: var(--muted); }
+
+    .sbtn {
+      flex-shrink: 0; background: #fff; color: #000;
+      border: none; border-radius: 9px;
+      padding: 10px 22px;
+      font-family: var(--font); font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+      display: flex; align-items: center; gap: 7px;
+      letter-spacing: -0.2px;
+    }
+    .sbtn:hover { opacity: 0.84; }
+    .sbtn:active { transform: scale(0.97); }
+    .sbtn:disabled { opacity: 0.38; cursor: not-allowed; transform: none; }
+
+    /* ── Date row ── */
+    .date-row { display: flex; gap: 8px; margin-bottom: 28px; }
+    .date-field { flex: 1; position: relative; }
+    .date-field label {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 10px; font-weight: 600; color: var(--muted);
+      letter-spacing: 0.6px; text-transform: uppercase; pointer-events: none;
+    }
+    input[type="date"] {
+      width: 100%; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 11px 14px 11px 50px;
+      color: var(--text); font-family: var(--mono); font-size: 13px;
+      outline: none; color-scheme: dark; transition: border-color 0.18s;
       -webkit-appearance: none;
     }
+    input[type="date"]:focus { border-color: var(--border2); }
 
-    input[type="text"]:focus,
-    input[type="date"]:focus,
-    select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(124,106,247,0.15);
+    /* ── Hint ── */
+    .hint {
+      font-size: 13px; color: var(--muted);
+      margin-bottom: 20px; line-height: 1.55;
+      letter-spacing: -0.15px;
     }
 
-    input[type="text"]::placeholder { color: var(--muted); }
-
-    .date-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
+    /* ── Status ── */
+    .status {
+      display: none; align-items: center; gap: 10px;
+      padding: 12px 16px; border-radius: 10px;
+      font-size: 13px; font-weight: 500;
+      margin-bottom: 22px; letter-spacing: -0.2px;
     }
-
-    .date-row .input-wrap { flex: 1; }
-
-    .date-row input[type="date"] {
-      padding-left: 38px;
-      color-scheme: dark;
-    }
-
-    /* ── Buttons ── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 22px;
-      border: none;
-      border-radius: 10px;
-      font-family: var(--font);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      letter-spacing: 0.3px;
-      transition: all 0.2s;
-      white-space: nowrap;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .btn::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(255,255,255,0);
-      transition: background 0.15s;
-    }
-
-    .btn:hover::after { background: rgba(255,255,255,0.06); }
-    .btn:active { transform: scale(0.97); }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-    }
-
-    .btn-ghost {
-      background: var(--surface2);
-      color: var(--muted2);
-      border: 1px solid var(--border2);
-    }
-
-    .btn-ghost:hover { color: var(--text); }
-
-    .btn-sm {
-      padding: 7px 14px;
-      font-size: 12px;
-    }
-
-    .btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-      transform: none !important;
-    }
+    .status.loading { display: flex; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--muted2); }
+    .status.error   { display: flex; background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.18); color: #fca5a5; }
+    .status.success { display: flex; background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.18); color: #86efac; }
 
     /* ── Spinner ── */
-    .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      flex-shrink: 0;
+    .sp {
+      width: 13px; height: 13px; flex-shrink: 0;
+      border: 1.5px solid rgba(255,255,255,0.18);
+      border-top-color: rgba(255,255,255,0.65);
+      border-radius: 50%; animation: spin 0.65s linear infinite;
     }
+    .sp.dark { border-color: rgba(0,0,0,0.15); border-top-color: rgba(0,0,0,0.6); }
 
-    /* ── Status bar ── */
-    .status-bar {
-      display: none;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 16px;
-      border-radius: 10px;
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 20px;
-    }
-
-    .status-bar.loading {
-      display: flex;
-      background: rgba(124,106,247,0.1);
-      border: 1px solid rgba(124,106,247,0.2);
-      color: var(--accent2);
-    }
-
-    .status-bar.error {
-      display: flex;
-      background: rgba(239,68,68,0.1);
-      border: 1px solid rgba(239,68,68,0.2);
-      color: #fca5a5;
-    }
-
-    .status-bar.success {
-      display: flex;
-      background: rgba(34,197,94,0.1);
-      border: 1px solid rgba(34,197,94,0.2);
-      color: #86efac;
-    }
-
-    /* ── Summary cards ── */
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    .stat-card {
-      background: var(--surface);
+    /* ── Stats row ── */
+    .stats {
+      display: flex; gap: 1px;
+      background: var(--border);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      text-align: center;
+      border-radius: var(--r); overflow: hidden;
+      margin-bottom: 20px;
     }
-
-    .stat-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 8px;
+    .stat { flex: 1; background: var(--surface); padding: 18px 20px; text-align: center; }
+    .stat-l {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
     }
-
-    .stat-value {
-      font-family: var(--mono);
-      font-size: 16px;
-      font-weight: 500;
-      color: var(--text);
+    .stat-v {
+      font-family: var(--mono); font-size: 15px;
+      font-weight: 500; color: var(--text); letter-spacing: -0.5px;
     }
 
     /* ── Table ── */
-    .table-wrap {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
+    .tcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+    .tbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 13px 18px; border-bottom: 1px solid var(--border);
     }
+    .tbar-label { font-size: 13px; font-weight: 500; color: var(--muted2); letter-spacing: -0.2px; }
 
-    .table-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 18px;
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .table-header-left {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--muted2);
-      letter-spacing: 0.5px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    thead tr {
-      background: var(--surface);
-    }
-
+    table { width: 100%; border-collapse: collapse; }
     th {
-      text-align: left;
-      padding: 12px 18px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: var(--muted);
+      text-align: left; padding: 11px 18px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.6px;
+      text-transform: uppercase; color: var(--muted);
       border-bottom: 1px solid var(--border);
+      background: var(--surface2);
     }
-
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background 0.15s;
-    }
-
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--surface2); }
-
     td {
-      padding: 13px 18px;
-      font-size: 13px;
-      color: var(--muted2);
-      font-family: var(--mono);
+      padding: 13px 18px; font-size: 13px; color: var(--muted2);
+      font-family: var(--mono); border-bottom: 1px solid var(--border);
+      letter-spacing: -0.3px;
     }
-
-    td.date-col { color: var(--text); font-weight: 500; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr { transition: background 0.12s; }
+    tbody tr:hover { background: var(--surface2); }
+    td.tp { color: var(--text); font-weight: 500; }
 
     /* ── Badges ── */
-    .badge {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 5px;
-      font-size: 11px;
-      font-weight: 600;
-      font-family: var(--mono);
+    .bg {
+      display: inline-block; padding: 3px 9px; border-radius: 100px;
+      font-size: 11px; font-weight: 500; font-family: var(--mono);
     }
+    .bg-g { background: rgba(34,197,94,0.09); color: #4ade80; border: 1px solid rgba(34,197,94,0.14); }
+    .bg-d { background: rgba(255,255,255,0.05); color: var(--muted2); border: 1px solid var(--border); }
 
-    .badge-green { background: rgba(34,197,94,0.12); color: #4ade80; }
-    .badge-blue  { background: rgba(124,106,247,0.12); color: var(--accent2); }
-    .badge-gray  { background: rgba(107,104,128,0.2); color: var(--muted2); }
-
-    /* ── Change timeline ── */
-    .change-item {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 0;
-      border-bottom: 1px solid var(--border);
+    /* ── Ghost btn ── */
+    .ghost {
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border2);
+      color: var(--muted2); border-radius: 8px;
+      padding: 7px 14px; font-family: var(--font);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: all 0.15s; letter-spacing: -0.2px;
+      text-decoration: none; display: inline-flex; align-items: center;
     }
+    .ghost:hover { background: rgba(255,255,255,0.09); color: var(--text); }
 
-    .change-item:last-child { border-bottom: none; }
-
-    .change-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      flex-shrink: 0;
+    /* ── Result box ── */
+    .rbox {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: var(--r); padding: 24px;
+      animation: up 0.25s ease both;
     }
-
-    .change-date {
-      font-family: var(--mono);
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text);
-      flex: 1;
+    .rbox-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
     }
-
-    .change-digest {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
+    .rurl {
+      font-family: var(--mono); font-size: 13px; color: var(--text);
+      word-break: break-all; margin-bottom: 8px;
+      letter-spacing: -0.3px; line-height: 1.5;
     }
+    .rmeta { font-size: 13px; color: var(--muted); margin-bottom: 18px; letter-spacing: -0.2px; }
+    .ractions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-    /* ── Dead link result ── */
-    .result-box {
-      background: var(--surface2);
-      border: 1px solid var(--border2);
-      border-radius: 12px;
-      padding: 20px;
+    .pbtn {
+      background: #fff; color: #000; border: none;
+      border-radius: 8px; padding: 8px 18px;
+      font-family: var(--font); font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s;
+      text-decoration: none; display: inline-flex; align-items: center;
+      letter-spacing: -0.2px;
     }
+    .pbtn:hover { opacity: 0.84; }
 
-    .result-url {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--accent2);
-      word-break: break-all;
-      margin-bottom: 12px;
+    /* ── Change list ── */
+    .clist { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+    .clist-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 13px 18px; border-bottom: 1px solid var(--border);
     }
-
-    .result-meta {
-      font-size: 13px;
-      color: var(--muted2);
-      margin-bottom: 16px;
+    .ci {
+      display: flex; align-items: center; gap: 14px;
+      padding: 13px 18px; border-bottom: 1px solid var(--border);
+      transition: background 0.12s;
     }
+    .ci:last-child { border-bottom: none; }
+    .ci:hover { background: var(--surface2); }
+    .ci-num { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 22px; flex-shrink: 0; text-align: right; }
+    .ci-date { font-family: var(--mono); font-size: 13px; color: var(--text); font-weight: 500; flex: 1; letter-spacing: -0.3px; }
+    .ci-time { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    .ci-hash { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.2px; }
 
-    /* ── Save result ── */
-    .save-result {
-      display: none;
-    }
-
-    .copy-btn {
-      font-family: var(--mono);
-      font-size: 11px;
-    }
-
-    /* ── Empty state ── */
-    .empty {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--muted);
-    }
-
-    .empty-icon { font-size: 40px; margin-bottom: 12px; }
-    .empty-text { font-size: 14px; }
+    /* ── Empty ── */
+    .empty { text-align: center; padding: 80px 20px; }
+    .empty-icon { font-size: 28px; opacity: 0.25; margin-bottom: 12px; }
+    .empty-title { font-size: 15px; font-weight: 500; color: var(--muted2); margin-bottom: 5px; letter-spacing: -0.3px; }
+    .empty-sub   { font-size: 13px; color: var(--muted); }
 
     /* ── Animations ── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(12px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .fade-in { animation: fadeUp 0.3s ease both; }
+    @keyframes up   { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Responsive ── */
-    @media (max-width: 600px) {
-      .input-row { flex-direction: column; }
-      .summary-grid { grid-template-columns: 1fr 1fr; }
-      .tab { font-size: 11px; padding: 9px 8px; }
-      h1 { letter-spacing: -1px; }
+    @media (max-width:580px) {
+      .tabs { flex-wrap: wrap; border-radius: 14px; }
+      .tab  { font-size: 12px; padding: 7px 13px; }
+      h1    { letter-spacing: -1.5px; }
+      .stats { flex-direction: column; gap: 0; }
+      .date-row { flex-direction: column; }
       td, th { padding: 10px 12px; }
     }
   </style>
 </head>
 <body>
-<div class="wrapper">
+<div class="glow"></div>
+<div class="wrap">
 
   <!-- Header -->
   <header>
-    <div class="logo">
-      <div class="logo-mark">W</div>
-      <span class="logo-text">Wayback</span>
-    </div>
-    <h1>Explore the <span>archived</span> web.</h1>
-    <p class="subtitle">Search snapshots, recover dead links, detect changes, and preserve pages — powered by Internet Archive.</p>
+    <div class="pill"><span class="dot"></span> Powered by Internet Archive</div>
+    <h1>Explore the archived web</h1>
+    <p class="sub">Search snapshots, recover dead links, detect changes, and preserve pages — for free.</p>
   </header>
 
   <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab active" onclick="switchTab('search', this)">Search Snapshots</button>
-    <button class="tab" onclick="switchTab('deadlink', this)">Dead Link Recovery</button>
-    <button class="tab" onclick="switchTab('changes', this)">Change Detection</button>
-    <button class="tab" onclick="switchTab('save', this)">Save Page</button>
+  <div class="tabs-row">
+    <div class="tabs">
+      <button class="tab active" onclick="sw('search',this)">Search</button>
+      <button class="tab" onclick="sw('deadlink',this)">Dead Link</button>
+      <button class="tab" onclick="sw('changes',this)">Changes</button>
+      <button class="tab" onclick="sw('save',this)">Save Page</button>
+    </div>
   </div>
 
-  <!-- ── PANEL: Search ── -->
+  <!-- Search -->
   <div class="panel active" id="panel-search">
-    <div class="card">
-      <div class="card-title">Search Archive</div>
-      <div class="input-row">
-        <div class="input-wrap">
-          <span class="icon">⌕</span>
-          <input type="text" id="search-url" placeholder="example.com or https://example.com/page" maxlength="500"/>
-        </div>
-        <button class="btn btn-primary" id="search-btn" onclick="doSearch()">
-          <span class="btn-label">Search</span>
-        </button>
+    <div class="sbox">
+      <input type="text" id="search-url" placeholder="example.com or https://example.com/page" maxlength="500" autocomplete="off" spellcheck="false"/>
+      <button class="sbtn" id="search-btn" onclick="doSearch()"><span>Search</span></button>
+    </div>
+    <div class="date-row">
+      <div class="date-field">
+        <label>From</label>
+        <input type="date" id="from-date"/>
       </div>
-      <div class="date-row">
-        <div class="input-wrap">
-          <span class="icon">↦</span>
-          <input type="date" id="from-date" title="From date"/>
-        </div>
-        <div class="input-wrap">
-          <span class="icon">↦</span>
-          <input type="date" id="to-date" title="To date"/>
-        </div>
+      <div class="date-field">
+        <label>To</label>
+        <input type="date" id="to-date"/>
       </div>
     </div>
-
-    <div class="status-bar" id="search-status"></div>
-
-    <div id="summary-grid" class="summary-grid" style="display:none">
-      <div class="stat-card">
-        <div class="stat-label">First Seen</div>
-        <div class="stat-value" id="stat-first">—</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Last Seen</div>
-        <div class="stat-value" id="stat-last">—</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Unique Snapshots</div>
-        <div class="stat-value" id="stat-total">—</div>
-      </div>
+    <div class="status" id="s-search"></div>
+    <div class="stats" id="stats-row" style="display:none">
+      <div class="stat"><div class="stat-l">First Seen</div><div class="stat-v" id="s-first">—</div></div>
+      <div class="stat"><div class="stat-l">Last Seen</div><div class="stat-v" id="s-last">—</div></div>
+      <div class="stat"><div class="stat-l">Unique Snapshots</div><div class="stat-v" id="s-total">—</div></div>
     </div>
-
-    <div id="search-results" style="display:none">
-      <div class="table-wrap">
-        <div class="table-header">
-          <span class="table-header-left" id="results-label">Results</span>
-          <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Export CSV</button>
+    <div id="search-res" style="display:none">
+      <div class="tcard">
+        <div class="tbar">
+          <span class="tbar-label" id="res-label">Results</span>
+          <button class="ghost" onclick="exportCSV()">Export CSV</button>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Time (UTC)</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="results-body"></tbody>
-        </table>
+        <table><thead><tr><th>Date</th><th>Time UTC</th><th>Type</th><th>Status</th><th></th></tr></thead>
+        <tbody id="res-body"></tbody></table>
       </div>
     </div>
-
     <div class="empty" id="search-empty" style="display:none">
-      <div class="empty-icon">◌</div>
-      <div class="empty-text">No snapshots found for this URL.</div>
+      <div class="empty-icon">○</div>
+      <div class="empty-title">No snapshots found</div>
+      <div class="empty-sub">Try a different URL or expand the date range.</div>
     </div>
   </div>
 
-  <!-- ── PANEL: Dead Link Recovery ── -->
+  <!-- Dead Link -->
   <div class="panel" id="panel-deadlink">
-    <div class="card">
-      <div class="card-title">Dead Link Recovery</div>
-      <p style="font-size:13px;color:var(--muted2);margin-bottom:16px;">Paste any broken or deleted URL. We'll find the closest archived version.</p>
-      <div class="input-row">
-        <div class="input-wrap">
-          <span class="icon">⌕</span>
-          <input type="text" id="dead-url" placeholder="https://deleted-page.com/article" maxlength="500"/>
-        </div>
-        <button class="btn btn-primary" id="dead-btn" onclick="doDeadLink()">
-          <span class="btn-label">Recover</span>
-        </button>
-      </div>
+    <p class="hint">Paste any broken or deleted URL — we'll find the closest archived version.</p>
+    <div class="sbox" style="margin-bottom:28px">
+      <input type="text" id="dead-url" placeholder="https://deleted-page.com/article" maxlength="500" autocomplete="off" spellcheck="false"/>
+      <button class="sbtn" id="dead-btn" onclick="doDeadLink()"><span>Recover</span></button>
     </div>
-
-    <div class="status-bar" id="dead-status"></div>
-
-    <div id="dead-result" style="display:none">
-      <div class="result-box fade-in">
-        <div class="result-url" id="dead-archived-url"></div>
-        <div class="result-meta" id="dead-meta"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a id="dead-link" href="#" target="_blank" class="btn btn-primary btn-sm">Open Archive</a>
-          <button class="btn btn-ghost btn-sm copy-btn" onclick="copyText(document.getElementById('dead-archived-url').textContent)">Copy URL</button>
+    <div class="status" id="s-dead"></div>
+    <div id="dead-res" style="display:none">
+      <div class="rbox">
+        <div class="rbox-label">Archived Version Found</div>
+        <div class="rurl" id="dead-url-out"></div>
+        <div class="rmeta" id="dead-meta"></div>
+        <div class="ractions">
+          <a id="dead-link" href="#" target="_blank" class="pbtn">Open Archive</a>
+          <button class="ghost" onclick="copyText(document.getElementById('dead-url-out').textContent)">Copy URL</button>
         </div>
       </div>
     </div>
-
     <div class="empty" id="dead-empty" style="display:none">
       <div class="empty-icon">✕</div>
-      <div class="empty-text">No archived version found for this URL.</div>
+      <div class="empty-title">No archive found</div>
+      <div class="empty-sub">This URL has never been archived or was removed.</div>
     </div>
   </div>
 
-  <!-- ── PANEL: Change Detection ── -->
+  <!-- Changes -->
   <div class="panel" id="panel-changes">
-    <div class="card">
-      <div class="card-title">Change Detection</div>
-      <p style="font-size:13px;color:var(--muted2);margin-bottom:16px;">See every time a page's content changed. Each entry is a unique version.</p>
-      <div class="input-row">
-        <div class="input-wrap">
-          <span class="icon">⌕</span>
-          <input type="text" id="change-url" placeholder="example.com/page" maxlength="500"/>
-        </div>
-        <button class="btn btn-primary" id="change-btn" onclick="doChanges()">
-          <span class="btn-label">Detect</span>
-        </button>
-      </div>
+    <p class="hint">Each entry is a unique page version — identical captures are deduplicated automatically.</p>
+    <div class="sbox" style="margin-bottom:28px">
+      <input type="text" id="change-url" placeholder="example.com/page" maxlength="500" autocomplete="off" spellcheck="false"/>
+      <button class="sbtn" id="change-btn" onclick="doChanges()"><span>Detect</span></button>
     </div>
-
-    <div class="status-bar" id="change-status"></div>
-
-    <div id="change-results" style="display:none">
-      <div class="card fade-in">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <div class="card-title" style="margin:0">Version History</div>
-          <span class="badge badge-blue" id="change-count"></span>
+    <div class="status" id="s-change"></div>
+    <div id="change-res" style="display:none">
+      <div class="clist">
+        <div class="clist-head">
+          <span class="tbar-label">Version History</span>
+          <span class="bg bg-d" id="change-count"></span>
         </div>
         <div id="change-list"></div>
       </div>
     </div>
-
     <div class="empty" id="change-empty" style="display:none">
-      <div class="empty-icon">◌</div>
-      <div class="empty-text">No change history found for this URL.</div>
+      <div class="empty-icon">○</div>
+      <div class="empty-title">No versions found</div>
+      <div class="empty-sub">This URL has no recorded change history.</div>
     </div>
   </div>
 
-  <!-- ── PANEL: Save Page ── -->
+  <!-- Save -->
   <div class="panel" id="panel-save">
-    <div class="card">
-      <div class="card-title">Save Page Now</div>
-      <p style="font-size:13px;color:var(--muted2);margin-bottom:16px;">Capture a permanent snapshot of any public webpage right now.</p>
-      <div class="input-row">
-        <div class="input-wrap">
-          <span class="icon">⌕</span>
-          <input type="text" id="save-url" placeholder="https://example.com/page-to-preserve" maxlength="500"/>
-        </div>
-        <button class="btn btn-primary" id="save-btn" onclick="doSave()">
-          <span class="btn-label">Save</span>
-        </button>
-      </div>
+    <p class="hint">Capture a permanent snapshot of any public webpage. Useful before a page changes or disappears.</p>
+    <div class="sbox" style="margin-bottom:28px">
+      <input type="text" id="save-url" placeholder="https://example.com/page-to-preserve" maxlength="500" autocomplete="off" spellcheck="false"/>
+      <button class="sbtn" id="save-btn" onclick="doSave()"><span>Save</span></button>
     </div>
-
-    <div class="status-bar" id="save-status"></div>
-
-    <div id="save-result" style="display:none">
-      <div class="result-box fade-in">
-        <div class="card-title">Archived Successfully</div>
-        <div class="result-url" id="save-archived-url"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-          <a id="save-link" href="#" target="_blank" class="btn btn-primary btn-sm">Open Archive</a>
-          <button class="btn btn-ghost btn-sm copy-btn" onclick="copyText(document.getElementById('save-archived-url').textContent)">Copy URL</button>
+    <div class="status" id="s-save"></div>
+    <div id="save-res" style="display:none">
+      <div class="rbox">
+        <div class="rbox-label">Saved Successfully</div>
+        <div class="rurl" id="save-url-out"></div>
+        <div class="ractions" style="margin-top:16px">
+          <a id="save-link" href="#" target="_blank" class="pbtn">Open Archive</a>
+          <button class="ghost" onclick="copyText(document.getElementById('save-url-out').textContent)">Copy URL</button>
         </div>
       </div>
     </div>
   </div>
 
 </div>
-
 <script>
-  // ── Utilities ────────────────────────────────────────────────────────────
-  let currentSnapshots = [];
-  let currentUrl = '';
+  let snaps = [], curUrl = '';
 
-  function parseTs(ts) {
-    return {
-      date: `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)}`,
-      time: `${ts.slice(8,10)}:${ts.slice(10,12)}:${ts.slice(12,14)}`
-    };
-  }
+  const ts = t => ({ date:`${t.slice(0,4)}-${t.slice(4,6)}-${t.slice(6,8)}`, time:`${t.slice(8,10)}:${t.slice(10,12)}:${t.slice(12,14)}` });
+  const aurl = (t, u) => `https://web.archive.org/web/${t}/${u}`;
 
-  function archiveUrl(ts, url) {
-    return `https://web.archive.org/web/${ts}/${url}`;
-  }
-
-  function setStatus(id, type, msg) {
+  function setSt(id, type, msg) {
     const el = document.getElementById(id);
-    el.className = `status-bar ${type}`;
-    if (type === 'loading') {
-      el.innerHTML = `<div class="spinner"></div><span>${msg}</span>`;
-    } else if (type === 'error') {
-      el.innerHTML = `<span>⚠ ${msg}</span>`;
-    } else {
-      el.innerHTML = `<span>✓ ${msg}</span>`;
-    }
+    el.className = `status ${type}`;
+    el.innerHTML = type === 'loading' ? `<div class="sp dark"></div><span>${msg}</span>` : `<span>${msg}</span>`;
+  }
+  function clrSt(id) { document.getElementById(id).className = 'status'; }
+
+  function setBtnL(id, loading, label) {
+    const b = document.getElementById(id);
+    b.disabled = loading;
+    b.innerHTML = loading ? `<div class="sp dark"></div><span>Working…</span>` : `<span>${label}</span>`;
   }
 
-  function clearStatus(id) {
-    const el = document.getElementById(id);
-    el.className = 'status-bar';
-  }
+  function copyText(t) { navigator.clipboard.writeText(t).catch(() => prompt('Copy:', t)); }
 
-  function setBtnLoading(id, loading) {
-    const btn = document.getElementById(id);
-    const label = btn.querySelector('.btn-label');
-    if (loading) {
-      btn.disabled = true;
-      btn.innerHTML = `<div class="spinner"></div><span>Working…</span>`;
-    } else {
-      btn.disabled = false;
-      btn.innerHTML = `<span class="btn-label">${label ? label.textContent : btn.dataset.label}</span>`;
-    }
-  }
-
-  function copyText(text) {
-    navigator.clipboard.writeText(text).then(() => {
-      // brief visual feedback handled via alert fallback if clipboard fails
-    }).catch(() => {
-      prompt('Copy this URL:', text);
-    });
-  }
-
-  // ── Tab switching ─────────────────────────────────────────────────────────
-  function switchTab(name, el) {
+  function sw(name, el) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     el.classList.add('active');
     document.getElementById(`panel-${name}`).classList.add('active');
   }
 
-  // ── Enter key support ─────────────────────────────────────────────────────
-  document.getElementById('search-url').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
-  document.getElementById('dead-url').addEventListener('keydown', e => { if (e.key === 'Enter') doDeadLink(); });
-  document.getElementById('change-url').addEventListener('keydown', e => { if (e.key === 'Enter') doChanges(); });
-  document.getElementById('save-url').addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
+  ['search-url','dead-url','change-url','save-url'].forEach((id, i) => {
+    const fns = [doSearch, doDeadLink, doChanges, doSave];
+    document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') fns[i](); });
+  });
 
-  // ── Search ────────────────────────────────────────────────────────────────
   async function doSearch() {
     const url = document.getElementById('search-url').value.trim();
-    const from = document.getElementById('from-date').value.replace(/-/g, '');
-    const to   = document.getElementById('to-date').value.replace(/-/g, '');
-
     if (!url) return;
-
-    currentUrl = url;
-    document.getElementById('search-results').style.display = 'none';
-    document.getElementById('summary-grid').style.display = 'none';
-    document.getElementById('search-empty').style.display = 'none';
-    document.getElementById('results-body').innerHTML = '';
-
-    setBtnLoading('search-btn', true);
-    setStatus('search-status', 'loading', 'Searching Archive.org…');
-
+    curUrl = url;
+    ['search-res','stats-row','search-empty'].forEach(id => document.getElementById(id).style.display = 'none');
+    document.getElementById('res-body').innerHTML = '';
+    setBtnL('search-btn', true, 'Search');
+    setSt('s-search', 'loading', 'Searching Archive.org…');
     try {
-      let apiUrl = `/api/search?url=${encodeURIComponent(url)}`;
-      if (from) apiUrl += `&from=${from}`;
-      if (to)   apiUrl += `&to=${to}`;
-
-      const res  = await fetch(apiUrl);
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        setStatus('search-status', 'error', data.error || 'Search failed.');
-        return;
-      }
-
-      const snaps = data.snapshots;
-      currentSnapshots = snaps;
-
-      if (!snaps || snaps.length === 0) {
-        clearStatus('search-status');
-        document.getElementById('search-empty').style.display = 'block';
-        return;
-      }
-
-      clearStatus('search-status');
-
-      // Summary
-      const first = parseTs(snaps[snaps.length - 1].timestamp);
-      const last  = parseTs(snaps[0].timestamp);
-      document.getElementById('stat-first').textContent  = first.date;
-      document.getElementById('stat-last').textContent   = last.date;
-      document.getElementById('stat-total').textContent  = snaps.length;
-      document.getElementById('summary-grid').style.display = 'grid';
-      document.getElementById('results-label').textContent  = `${snaps.length} unique snapshots`;
-
-      // Table rows
-      const tbody = document.getElementById('results-body');
-      snaps.forEach(snap => {
-        const { date, time } = parseTs(snap.timestamp);
-        const link = archiveUrl(snap.timestamp, url);
-        const mime = snap.mimetype || '—';
-        const shortMime = mime.split('/')[1] || mime;
+      const from = document.getElementById('from-date').value.replace(/-/g,'');
+      const to   = document.getElementById('to-date').value.replace(/-/g,'');
+      let api = `/api/search?url=${encodeURIComponent(url)}`;
+      if (from) api += `&from=${from}`;
+      if (to)   api += `&to=${to}`;
+      const res = await fetch(api), data = await res.json();
+      if (!res.ok || data.error) { setSt('s-search','error', data.error||'Search failed.'); return; }
+      snaps = data.snapshots || [];
+      if (!snaps.length) { clrSt('s-search'); document.getElementById('search-empty').style.display='block'; return; }
+      clrSt('s-search');
+      const f = ts(snaps[snaps.length-1].timestamp), l = ts(snaps[0].timestamp);
+      document.getElementById('s-first').textContent = f.date;
+      document.getElementById('s-last').textContent  = l.date;
+      document.getElementById('s-total').textContent = snaps.length;
+      document.getElementById('stats-row').style.display = 'flex';
+      document.getElementById('res-label').textContent = `${snaps.length} unique snapshot${snaps.length!==1?'s':''}`;
+      const tbody = document.getElementById('res-body');
+      snaps.forEach(s => {
+        const {date,time} = ts(s.timestamp), link = aurl(s.timestamp, url);
+        const mime = (s.mimetype||'').split('/')[1] || s.mimetype || '—';
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="date-col">${date}</td>
-          <td>${time}</td>
-          <td><span class="badge badge-gray">${shortMime}</span></td>
-          <td><span class="badge badge-green">${snap.statuscode}</span></td>
-          <td>
-            <a href="${link}" target="_blank" class="btn btn-ghost btn-sm">View</a>
-          </td>
-        `;
+        tr.innerHTML = `<td class="tp">${date}</td><td>${time}</td><td><span class="bg bg-d">${mime}</span></td><td><span class="bg bg-g">${s.statuscode}</span></td><td><a href="${link}" target="_blank" class="ghost">View →</a></td>`;
         tbody.appendChild(tr);
       });
-
-      document.getElementById('search-results').style.display = 'block';
-
-    } catch (err) {
-      setStatus('search-status', 'error', 'Request failed. Check your connection.');
-    } finally {
-      document.getElementById('search-btn').disabled = false;
-      document.getElementById('search-btn').innerHTML = `<span class="btn-label">Search</span>`;
-    }
+      document.getElementById('search-res').style.display = 'block';
+    } catch { setSt('s-search','error','Request failed. Check your connection.'); }
+    finally   { setBtnL('search-btn', false, 'Search'); }
   }
 
-  // ── Export CSV ────────────────────────────────────────────────────────────
   function exportCSV() {
-    if (!currentSnapshots.length) return;
-    const rows = [['Date', 'Time', 'MIME Type', 'Status', 'Archive URL']];
-    currentSnapshots.forEach(s => {
-      const { date, time } = parseTs(s.timestamp);
-      rows.push([date, time, s.mimetype, s.statuscode, archiveUrl(s.timestamp, currentUrl)]);
-    });
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `wayback-${currentUrl.replace(/[^a-z0-9]/gi, '_')}.csv`;
-    a.click();
+    if (!snaps.length) return;
+    const rows = [['Date','Time','MIME','Status','URL']];
+    snaps.forEach(s => { const {date,time} = ts(s.timestamp); rows.push([date,time,s.mimetype,s.statuscode,aurl(s.timestamp,curUrl)]); });
+    const csv = rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+    Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:`wayback-${curUrl.replace(/[^a-z0-9]/gi,'_')}.csv`}).click();
   }
 
-  // ── Dead Link Recovery ────────────────────────────────────────────────────
   async function doDeadLink() {
     const url = document.getElementById('dead-url').value.trim();
     if (!url) return;
-
-    document.getElementById('dead-result').style.display = 'none';
-    document.getElementById('dead-empty').style.display = 'none';
-    setBtnLoading('dead-btn', true);
-    setStatus('dead-status', 'loading', 'Searching for archived version…');
-
+    ['dead-res','dead-empty'].forEach(id => document.getElementById(id).style.display='none');
+    setBtnL('dead-btn',true,'Recover'); setSt('s-dead','loading','Searching for archived version…');
     try {
-      const res  = await fetch(`/api/availability?url=${encodeURIComponent(url)}`);
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        setStatus('dead-status', 'error', data.error || 'Check failed.');
-        return;
-      }
-
+      const res = await fetch(`/api/availability?url=${encodeURIComponent(url)}`), data = await res.json();
+      if (!res.ok||data.error) { setSt('s-dead','error',data.error||'Check failed.'); return; }
       const snap = data?.archived_snapshots?.closest;
-
-      if (!snap || !snap.available) {
-        clearStatus('dead-status');
-        document.getElementById('dead-empty').style.display = 'block';
-        return;
-      }
-
-      clearStatus('dead-status');
-      const { date, time } = parseTs(snap.timestamp);
-      document.getElementById('dead-archived-url').textContent = snap.url;
-      document.getElementById('dead-meta').textContent = `Closest snapshot: ${date} at ${time} UTC — Status ${snap.status}`;
+      if (!snap?.available) { clrSt('s-dead'); document.getElementById('dead-empty').style.display='block'; return; }
+      clrSt('s-dead');
+      const {date,time} = ts(snap.timestamp);
+      document.getElementById('dead-url-out').textContent = snap.url;
+      document.getElementById('dead-meta').textContent = `Closest snapshot: ${date} at ${time} UTC · Status ${snap.status}`;
       document.getElementById('dead-link').href = snap.url;
-      document.getElementById('dead-result').style.display = 'block';
-
-    } catch (err) {
-      setStatus('dead-status', 'error', 'Request failed. Check your connection.');
-    } finally {
-      document.getElementById('dead-btn').disabled = false;
-      document.getElementById('dead-btn').innerHTML = `<span class="btn-label">Recover</span>`;
-    }
+      document.getElementById('dead-res').style.display = 'block';
+    } catch { setSt('s-dead','error','Request failed. Check your connection.'); }
+    finally  { setBtnL('dead-btn',false,'Recover'); }
   }
 
-  // ── Change Detection ──────────────────────────────────────────────────────
   async function doChanges() {
     const url = document.getElementById('change-url').value.trim();
     if (!url) return;
-
-    document.getElementById('change-results').style.display = 'none';
-    document.getElementById('change-empty').style.display = 'none';
-    setBtnLoading('change-btn', true);
-    setStatus('change-status', 'loading', 'Fetching version history…');
-
+    ['change-res','change-empty'].forEach(id => document.getElementById(id).style.display='none');
+    setBtnL('change-btn',true,'Detect'); setSt('s-change','loading','Fetching version history…');
     try {
-      const res  = await fetch(`/api/changes?url=${encodeURIComponent(url)}`);
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        setStatus('change-status', 'error', data.error || 'Detection failed.');
-        return;
-      }
-
-      const changes = data.changes;
-
-      if (!changes || changes.length === 0) {
-        clearStatus('change-status');
-        document.getElementById('change-empty').style.display = 'block';
-        return;
-      }
-
-      clearStatus('change-status');
+      const res = await fetch(`/api/changes?url=${encodeURIComponent(url)}`), data = await res.json();
+      if (!res.ok||data.error) { setSt('s-change','error',data.error||'Detection failed.'); return; }
+      const changes = data.changes||[];
+      if (!changes.length) { clrSt('s-change'); document.getElementById('change-empty').style.display='block'; return; }
+      clrSt('s-change');
       document.getElementById('change-count').textContent = `${changes.length} versions`;
-
       const list = document.getElementById('change-list');
       list.innerHTML = '';
-      changes.forEach((c, i) => {
-        const { date, time } = parseTs(c.timestamp);
-        const link = archiveUrl(c.timestamp, url);
-        const div = document.createElement('div');
-        div.className = 'change-item';
-        div.innerHTML = `
-          <div class="change-dot"></div>
-          <div class="change-date">${date} <span style="color:var(--muted);font-size:11px">${time}</span></div>
-          <div class="change-digest">${c.digest.slice(0, 10)}…</div>
-          <a href="${link}" target="_blank" class="btn btn-ghost btn-sm">View</a>
-        `;
+      changes.forEach((c,i) => {
+        const {date,time} = ts(c.timestamp), link = aurl(c.timestamp,url);
+        const div = document.createElement('div'); div.className='ci';
+        div.innerHTML = `<span class="ci-num">${i+1}</span><span class="ci-date">${date}</span><span class="ci-time">${time}</span><span class="ci-hash">${c.digest.slice(0,8)}</span><a href="${link}" target="_blank" class="ghost">View →</a>`;
         list.appendChild(div);
       });
-
-      document.getElementById('change-results').style.display = 'block';
-
-    } catch (err) {
-      setStatus('change-status', 'error', 'Request failed. Check your connection.');
-    } finally {
-      document.getElementById('change-btn').disabled = false;
-      document.getElementById('change-btn').innerHTML = `<span class="btn-label">Detect</span>`;
-    }
+      document.getElementById('change-res').style.display='block';
+    } catch { setSt('s-change','error','Request failed. Check your connection.'); }
+    finally  { setBtnL('change-btn',false,'Detect'); }
   }
 
-  // ── Save Page ─────────────────────────────────────────────────────────────
   async function doSave() {
     const url = document.getElementById('save-url').value.trim();
     if (!url) return;
-
-    document.getElementById('save-result').style.display = 'none';
-    setBtnLoading('save-btn', true);
-    setStatus('save-status', 'loading', 'Saving page to Archive.org… (this may take up to 20 seconds)');
-
+    document.getElementById('save-res').style.display='none';
+    setBtnL('save-btn',true,'Save'); setSt('s-save','loading','Saving to Archive.org — may take up to 20 seconds…');
     try {
-      const res  = await fetch('/api/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-      });
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        setStatus('save-status', 'error', data.error || 'Save failed.');
-        return;
-      }
-
-      setStatus('save-status', 'success', 'Page saved successfully.');
-      document.getElementById('save-archived-url').textContent = data.archived_url;
+      const res = await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})}), data = await res.json();
+      if (!res.ok||data.error) { setSt('s-save','error',data.error||'Save failed.'); return; }
+      setSt('s-save','success','Page saved successfully.');
+      document.getElementById('save-url-out').textContent = data.archived_url;
       document.getElementById('save-link').href = data.archived_url;
-      document.getElementById('save-result').style.display = 'block';
-
-    } catch (err) {
-      setStatus('save-status', 'error', 'Request failed. Check your connection.');
-    } finally {
-      document.getElementById('save-btn').disabled = false;
-      document.getElementById('save-btn').innerHTML = `<span class="btn-label">Save</span>`;
-    }
+      document.getElementById('save-res').style.display='block';
+    } catch { setSt('s-save','error','Request failed. Check your connection.'); }
+    finally  { setBtnL('save-btn',false,'Save'); }
   }
 </script>
 </body>
